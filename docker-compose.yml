@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # === PostgreSQL ===
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: yandex_client
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d yandex_client"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # === Redis ===
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # === FastAPI Application ===
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./app:/code/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # === ARQ Worker: Catalog Sync ===
+  worker-catalog:
+    build: .
+    command: arq app.workers.worker_settings.WorkerSettings --queue catalog
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # === ARQ Worker: Fulfillment (Order Processing) ===
+  worker-fulfillment:
+    build: .
+    command: arq app.workers.worker_settings.WorkerSettings --queue fulfillment
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # === ARQ Worker: Chat Bridge ===
+  worker-chat:
+    build: .
+    command: arq app.workers.worker_settings.WorkerSettings --queue chat
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:

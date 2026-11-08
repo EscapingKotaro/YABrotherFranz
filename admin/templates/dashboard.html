@@ -1,0 +1,128 @@
+<!-- app/admin/templates/dashboard.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — Yandex Market Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">📊 Dashboard — Yandex Market Client</h1>
+        
+        <!-- Метрики -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="text-gray-500 text-sm">Заказов всего</div>
+                <div class="text-3xl font-bold">{{ orders_total }}</div>
+            </div>
+            <div class="bg-green-100 rounded-lg shadow p-6">
+                <div class="text-gray-500 text-sm">Доставлено</div>
+                <div class="text-3xl font-bold text-green-700">{{ orders_delivered }}</div>
+            </div>
+            <div class="bg-yellow-100 rounded-lg shadow p-6">
+                <div class="text-gray-500 text-sm">В обработке</div>
+                <div class="text-3xl font-bold text-yellow-700">{{ orders_pending }}</div>
+            </div>
+            <div class="bg-red-100 rounded-lg shadow p-6">
+                <div class="text-gray-500 text-sm">Ошибки</div>
+                <div class="text-3xl font-bold text-red-700">{{ orders_failed }}</div>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="text-gray-500 text-sm">Активных чатов</div>
+                <div class="text-3xl font-bold">{{ chats_active }}</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="text-gray-500 text-sm">Опубликовано карточек</div>
+                <div class="text-3xl font-bold">{{ listings_published }}</div>
+            </div>
+        </div>
+        
+        <!-- Очереди Redis -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-xl font-bold mb-4"><i class="fa-solid fa-layer-group"></i> Очереди ARQ (Redis)</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {% for queue_name, length in queue_stats.items() %}
+                <div class="bg-gray-50 rounded p-4">
+                    <div class="text-gray-500 text-sm">{{ queue_name }}</div>
+                    <div class="text-2xl font-bold">{{ length }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Последние заказы -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-xl font-bold mb-4"><i class="fa-solid fa-cart-shopping"></i> Последние заказы</h2>
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left py-2">Order ID</th>
+                        <th class="text-left py-2">Campaign</th>
+                        <th class="text-left py-2">Status</th>
+                        <th class="text-left py-2">Code</th>
+                        <th class="text-left py-2">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in recent_orders %}
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="py-2">{{ order.order_id }}</td>
+                        <td class="py-2">{{ order.campaign_id }}</td>
+                        <td class="py-2">
+                            <span class="px-2 py-1 rounded text-xs
+                                {% if order.status == 'DELIVERED' %}bg-green-100 text-green-700
+                                {% elif order.status == 'FAILED_FULFILLMENT' %}bg-red-100 text-red-700
+                                {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                                {{ order.status }}
+                            </span>
+                        </td>
+                        <td class="py-2 font-mono text-sm">{{ order.code_value or '-' }}</td>
+                        <td class="py-2 text-sm">{{ order.created_at.strftime('%Y-%m-%d %H:%M') if order.created_at else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Ошибки карточек -->
+        {% if error_listings %}
+        <div class="bg-red-50 rounded-lg shadow p-6">
+            <h2 class="text-xl font-bold mb-4 text-red-700"><i class="fa-solid fa-exclamation-triangle"></i> Ошибки карточек</h2>
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left py-2">External ID</th>
+                        <th class="text-left py-2">Channel</th>
+                        <th class="text-left py-2">Errors</th>
+                        <th class="text-left py-2">Last Error</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for listing in error_listings %}
+                    <tr class="border-b hover:bg-red-100">
+                        <td class="py-2 font-mono">{{ listing.external_id }}</td>
+                        <td class="py-2">{{ listing.channel_id }}</td>
+                        <td class="py-2">{{ listing.consecutive_error_count }}</td>
+                        <td class="py-2 text-sm text-red-700">{{ listing.last_error_text[:100] if listing.last_error_text else '-' }}...</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        
+        <!-- Ссылки -->
+        <div class="mt-8 text-center">
+            <a href="/admin" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                <i class="fa-solid fa-database"></i> Открыть SQLAdmin
+            </a>
+        </div>
+    </div>
+</body>
+</html>
