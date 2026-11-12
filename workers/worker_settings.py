@@ -3,10 +3,13 @@ from arq.connections import RedisSettings
 from app.config import settings
 
 # Настройки Redis для ARQ
+parsed = urlparse(settings.redis_url)
+
 redis_settings = RedisSettings(
-    host=settings.redis_host,
-    port=settings.redis_port,
-    database=settings.redis_db,
+    host=parsed.hostname or "redis",
+    port=parsed.port or 6379,
+    database=int(parsed.path.lstrip('/') or 0),
+    password=parsed.password,
 )
 
 # Функции, которые будут выполняться воркерами
