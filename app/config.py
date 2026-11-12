@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     
     # === Яндекс Маркет (мульти-аккаунтность) ===
     yandex_accounts_json: str = "[]"
+    activation_portal_url: str = "https://systemseller.net/"
     
     @property
     def yandex_accounts(self) -> List[YandexAccountConfig]:
