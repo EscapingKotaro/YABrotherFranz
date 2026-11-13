@@ -32,6 +32,9 @@ class Chat(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_sync_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_activity = Column(DateTime(timezone=True), server_default=func.now())
+    def __str__(self):
+        return f"Чат #{self.id} | {self.customer_name or 'Неизвестный'} ({self.crm_marketplace_name})"
+
 
 
 class ChatMessage(Base):
@@ -58,3 +61,6 @@ class ChatMessage(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     sent_to_crm_at = Column(DateTime(timezone=True), nullable=True)
     sent_to_yandex_at = Column(DateTime(timezone=True), nullable=True)
+
+    def __str__(self):
+        return f"Сообщение #{self.id} от {self.sender} ({self.status})"

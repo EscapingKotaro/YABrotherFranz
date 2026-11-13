@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     database_url: str = "postgresql+asyncpg://user:pass@localhost:5432/yandex_client"
     redis_url: str = "redis://localhost:6379/0"
+    secret_key: str = "fallback_secret_key_change_in_prod"
+    admin_username: str = "admin"
+    admin_password: str = "admin"
     
     # === Тестовый режим ===
     enable_mock_mode: bool = False

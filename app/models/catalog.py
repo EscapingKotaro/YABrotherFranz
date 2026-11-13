@@ -23,6 +23,8 @@ class SyncState(Base):
     # Временные метки
     last_sync_at = Column(DateTime(timezone=True), server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    def __str__(self):
+        return f"Синхронизация канала #{self.channel_id}"
 
 
 class CatalogItem(Base):
@@ -62,6 +64,9 @@ class CatalogItem(Base):
     # Временные метки
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    def __str__(self):
+        return f"Товар #{self.id} | {self.product_name or 'Без имени'}"
+
 
 
 class Listing(Base):
@@ -100,3 +105,5 @@ class Listing(Base):
     # Временные метки
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    def __str__(self):
+        return f"Объявление {self.external_id} ({self.status})"
