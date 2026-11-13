@@ -10,6 +10,7 @@ from app.schemas.yandex_webhook import OrderWebhookDTO
 from app.services.yandex_webhook_validator import YandexWebhookValidator
 from app.models.order import Order
 from sqlalchemy import select
+from app.models.webhook import WebhookLog
 
 router = APIRouter(prefix="/webhook/yandex", tags=["webhooks"])
 logger = logging.getLogger(__name__)
@@ -68,6 +69,17 @@ async def receive_order_webhook(
     except Exception as e:
         logger.error(f"[Webhook] Failed to parse payload: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid payload: {str(e)}")
+
+    log_entry = WebhookLog(
+    campaign_id=campaign_id,
+    order_id=str(webhook_data.orderId),
+    webhook_type="order_status",
+    payload=webhook_data.model_dump(),
+    signature_valid=True, # Если дошли сюда, значит валидна
+    status="accepted"
+)
+    session.add(log_entry)
+    await session.commit()
     
     # 5. Извлекаем order_id из payload
     order_id = str(webhook_data.orderId)

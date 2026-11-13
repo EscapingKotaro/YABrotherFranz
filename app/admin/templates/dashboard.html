@@ -10,7 +10,7 @@
 </head>
 <body class="bg-gray-100">
     <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold mb-8">📊 Dashboard — Yandex Market Client</h1>
+        <h1 class="text-3xl font-bold mb-8">Dashboard — Yandex Market Client</h1>
         
         <!-- Метрики -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -89,6 +89,49 @@
                 </tbody>
             </table>
         </div>
+
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+    <h2 class="text-xl font-bold mb-4"><i class="fa-solid fa-tower-broadcast"></i> Статус очередей (ARQ)</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {% for queue, length in queue_stats.items() %}
+        <div class="bg-blue-50 rounded p-4 text-center">
+            <div class="text-gray-500 text-sm">{{ queue }}</div>
+            <div class="text-3xl font-bold text-blue-700">{{ length }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow p-6 mb-8">
+    <h2 class="text-xl font-bold mb-4"><i class="fa-solid fa-bolt"></i> Последние вебхуки</h2>
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="border-b">
+                <th class="text-left py-2">Время</th>
+                <th class="text-left py-2">Тип</th>
+                <th class="text-left py-2">Order ID</th>
+                <th class="text-left py-2">Статус</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for wh in recent_webhooks %}
+            <tr class="border-b hover:bg-gray-50">
+                <td class="py-2">{{ wh.created_at.strftime('%H:%M:%S') }}</td>
+                <td class="py-2">{{ wh.webhook_type }}</td>
+                <td class="py-2 font-mono">{{ wh.order_id or '-' }}</td>
+                <td class="py-2">
+                    <span class="px-2 py-1 rounded text-xs
+                        {% if wh.status == 'accepted' %}bg-green-100 text-green-700
+                        {% elif wh.status == 'error' %}bg-red-100 text-red-700
+                        {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                        {{ wh.status }}
+                    </span>
+                </td
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
         
         <!-- Ошибки карточек -->
         {% if error_listings %}

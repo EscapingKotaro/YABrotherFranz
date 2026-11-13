@@ -83,6 +83,21 @@ async def dashboard(
     except Exception as e:
         logger.error(f"[Dashboard] Failed to read Redis queues: {e}")
         queue_stats = {"error": str(e)}
+
+    queue_stats = {}
+    try:
+        redis_pool = request.app.state.redis_pool
+        for queue_name in ['arq:queue:fulfillment', 'arq:queue:catalog', 'arq:queue:chat', 'arq:queue:default']:
+            length = await redis_pool.llen(queue_name)
+            queue_stats[queue_name.replace('arq:queue:', '')] = length
+    except Exception as e:
+        queue_stats = {"error": str(e)}
+
+    # 2. Последние 10 вебхуков
+    recent_webhooks_result = await session.execute(
+        select(WebhookLog).order_by(WebhookLog.created_at.desc()).limit(10)
+    )
+    recent_webhooks = recent_webhooks_result.scalars().all()
     
     return templates.TemplateResponse(
         "dashboard.html",
@@ -98,5 +113,7 @@ async def dashboard(
             "recent_orders": recent_orders,
             "error_listings": error_listings,
             "queue_stats": queue_stats,
+        "queue_stats": queue_stats,
+        "recent_webhooks": recent_webhooks,
         }
     )
