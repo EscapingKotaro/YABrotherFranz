@@ -14,6 +14,7 @@ from app.database import engine
 from app.models.order import Order
 from app.models.chat import Chat, ChatMessage
 from app.models.catalog import CatalogItem, Listing, SyncState
+from app.models.webhook import WebhookLog
 
 
 # =====================================================================
@@ -150,6 +151,42 @@ class SyncStateAdmin(ModelView, model=SyncState):
     can_edit = False
     can_delete = False
 
+class WebhookLogAdmin(ModelView, model=WebhookLog):
+    name = "Вебхук"
+    name_plural = "Журнал вебхуков"
+    icon = "fa-solid fa-bolt"
+
+    column_list = [
+        WebhookLog.id,
+        WebhookLog.webhook_type,
+        WebhookLog.campaign_id,
+        WebhookLog.order_id,
+        WebhookLog.status,
+        WebhookLog.signature_valid,
+        WebhookLog.created_at,
+    ]
+
+    column_details_list = [
+        WebhookLog.id,
+        WebhookLog.webhook_type,
+        WebhookLog.campaign_id,
+        WebhookLog.order_id,
+        WebhookLog.signature_valid,
+        WebhookLog.status,
+        WebhookLog.error_message,
+        WebhookLog.payload,
+        WebhookLog.created_at,
+    ]
+
+    column_searchable_list = [WebhookLog.order_id, WebhookLog.campaign_id, WebhookLog.webhook_type]
+    column_filters = [WebhookLog.webhook_type, WebhookLog.status, WebhookLog.signature_valid]
+    column_default_sort = (WebhookLog.created_at, True)
+    page_size = 50
+
+    can_create = False
+    can_edit = False
+    can_delete = False
+
 
 # =====================================================================
 # Подключение
@@ -170,5 +207,6 @@ def setup_admin(app) -> Admin:
     admin.add_view(CatalogItemAdmin)
     admin.add_view(ListingAdmin)
     admin.add_view(SyncStateAdmin)
+    admin.add_view(WebhookLogAdmin)
 
     return admin
