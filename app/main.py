@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from arq import create_pool
 from arq.connections import RedisSettings
 import logging
+from urllib.parse import urlparse
 
 from app.config import settings
 from app.database import init_db
@@ -28,8 +29,16 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("✅ Database initialized")
     
-    # Подключение к Redis
-    app.state.redis_pool = await create_pool(RedisSettings.from_url(settings.redis_url))
+    # Подключение к Redis (ПРАВИЛЬНЫЙ ПАРСИНГ URL)
+    parsed = urlparse(settings.redis_url)
+    redis_settings = RedisSettings(
+        host=parsed.hostname or "redis",
+        port=parsed.port or 6379,
+        database=int(parsed.path.lstrip('/') or 0),
+        password=parsed.password,
+    )
+    
+    app.state.redis_pool = await create_pool(redis_settings)
     logger.info("✅ Redis connected")
     
     yield
