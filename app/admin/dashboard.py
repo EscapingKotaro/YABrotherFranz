@@ -10,6 +10,7 @@ from app.database import get_session
 from app.models.order import Order
 from app.models.chat import Chat, ChatMessage
 from app.models.catalog import Listing
+from app.models.webhook import WebhookLog
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 logger = logging.getLogger(__name__)
