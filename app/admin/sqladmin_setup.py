@@ -1,7 +1,8 @@
 # app/admin/sqladmin_setup.py
 """
 Read-only админка SQLAdmin + авторизация.
-Упрощенная версия без сложных импортов фильтров, чтобы избежать ошибок версий.
+Исправленная версия: все column_default_sort и searchable используют строки,
+чтобы избежать AttributeError.split в SQLAdmin.
 """
 
 from sqladmin import Admin, ModelView
@@ -39,7 +40,7 @@ class AdminAuth(AuthenticationBackend):
 
 
 # =====================================================================
-# View'ы (Упрощенные, без ручных импортов фильтров)
+# View'ы
 # =====================================================================
 
 class OrderAdmin(ModelView, model=Order):
@@ -47,12 +48,12 @@ class OrderAdmin(ModelView, model=Order):
     name_plural = "Заказы"
     icon = "fa-solid fa-cart-shopping"
 
-    column_list = [Order.id, Order.order_id, Order.campaign_id, Order.status, Order.code_value, Order.total_amount, Order.created_at]
-    column_details_list = [Order.id, Order.order_id, Order.campaign_id, Order.customer_id, Order.status, Order.total_amount, Order.currency, Order.code_id, Order.code_value, Order.created_at, Order.delivered_at]
+    column_list = ["id", "order_id", "campaign_id", "status", "code_value", "total_amount", "created_at", "delivered_at"]
+    column_details_list = ["id", "order_id", "campaign_id", "customer_id", "status", "total_amount", "currency", "code_id", "code_value", "created_at", "delivered_at"]
 
-    column_searchable_list = [Order.order_id, Order.code_value, Order.campaign_id]
-    column_filters = [Order.status, Order.campaign_id]  # SQLAdmin сам создаст выпадающий список для этих полей!
-    column_default_sort = (Order.created_at, True)
+    column_searchable_list = ["order_id", "code_value", "campaign_id", "customer_id"]
+    column_filters = ["status", "campaign_id"]
+    column_default_sort = ("created_at", True)  # 🔥 СТРОКА, а не Order.created_at
     page_size = 25
 
     can_create = False
@@ -65,12 +66,12 @@ class ChatAdmin(ModelView, model=Chat):
     name_plural = "Чаты"
     icon = "fa-solid fa-comments"
 
-    column_list = [Chat.id, Chat.yandex_chat_id, Chat.crm_marketplace_name, Chat.customer_name, Chat.platform, Chat.is_active, Chat.last_activity]
-    column_details_list = [Chat.id, Chat.yandex_campaign_id, Chat.crm_marketplace_name, Chat.yandex_chat_id, Chat.external_chat_id, Chat.crm_chat_id, Chat.customer_name, Chat.product_name, Chat.platform, Chat.is_active, Chat.is_priority, Chat.last_activity]
+    column_list = ["id", "yandex_chat_id", "crm_marketplace_name", "customer_name", "platform", "is_active", "last_activity"]
+    column_details_list = ["id", "yandex_campaign_id", "crm_marketplace_name", "yandex_chat_id", "external_chat_id", "crm_chat_id", "customer_name", "product_name", "platform", "is_active", "is_priority", "last_activity"]
 
-    column_searchable_list = [Chat.yandex_chat_id, Chat.customer_name, Chat.crm_marketplace_name]
-    column_filters = [Chat.crm_marketplace_name, Chat.platform, Chat.is_active]
-    column_default_sort = (Chat.last_activity, True)
+    column_searchable_list = ["yandex_chat_id", "customer_name", "crm_marketplace_name", "external_chat_id"]
+    column_filters = ["crm_marketplace_name", "platform", "is_active"]
+    column_default_sort = ("last_activity", True)  # 🔥 СТРОКА
     page_size = 25
 
     can_create = False
@@ -83,12 +84,12 @@ class ChatMessageAdmin(ModelView, model=ChatMessage):
     name_plural = "Сообщения"
     icon = "fa-solid fa-message"
 
-    column_list = [ChatMessage.id, ChatMessage.chat_id, ChatMessage.sender, ChatMessage.status, ChatMessage.yandex_message_id, ChatMessage.created_at]
-    column_details_list = [ChatMessage.id, ChatMessage.chat_id, ChatMessage.sender, ChatMessage.text, ChatMessage.yandex_message_id, ChatMessage.status, ChatMessage.error_message, ChatMessage.created_at]
+    column_list = ["id", "chat_id", "sender", "status", "yandex_message_id", "created_at"]
+    column_details_list = ["id", "chat_id", "sender", "text", "yandex_message_id", "status", "error_message", "created_at"]
 
-    column_searchable_list = [ChatMessage.yandex_message_id, ChatMessage.external_message_id]
-    column_filters = [ChatMessage.sender, ChatMessage.status]
-    column_default_sort = (ChatMessage.created_at, True)
+    column_searchable_list = ["yandex_message_id", "external_message_id"]
+    column_filters = ["sender", "status"]
+    column_default_sort = ("created_at", True)  # 🔥 СТРОКА
     page_size = 50
 
     can_create = False
@@ -101,12 +102,12 @@ class CatalogItemAdmin(ModelView, model=CatalogItem):
     name_plural = "Товары"
     icon = "fa-solid fa-box"
 
-    column_list = [CatalogItem.id, CatalogItem.channel_id, CatalogItem.channel_slot_id, CatalogItem.product_name, CatalogItem.publish, CatalogItem.withdraw, CatalogItem.target_amount, CatalogItem.updated_at]
-    column_details_list = [CatalogItem.id, CatalogItem.channel_id, CatalogItem.channel_slot_id, CatalogItem.sellable_position_id, CatalogItem.product_name, CatalogItem.product_variant_name, CatalogItem.axis_values, CatalogItem.publish, CatalogItem.withdraw, CatalogItem.target_amount, CatalogItem.target_currency, CatalogItem.presentation_title, CatalogItem.updated_at]
+    column_list = ["id", "channel_id", "channel_slot_id", "product_name", "publish", "withdraw", "target_amount", "updated_at"]
+    column_details_list = ["id", "channel_id", "channel_slot_id", "sellable_position_id", "product_name", "product_variant_name", "publish", "withdraw", "target_amount", "target_currency", "presentation_title", "updated_at"]
 
-    column_searchable_list = [CatalogItem.product_name, CatalogItem.product_variant_name]
-    column_filters = [CatalogItem.channel_id, CatalogItem.publish, CatalogItem.withdraw]
-    column_default_sort = (CatalogItem.updated_at, True)
+    column_searchable_list = ["product_name", "product_variant_name"]
+    column_filters = ["channel_id", "publish", "withdraw"]
+    column_default_sort = ("updated_at", True)  # 🔥 СТРОКА
     page_size = 50
 
     can_create = False
@@ -119,12 +120,12 @@ class ListingAdmin(ModelView, model=Listing):
     name_plural = "Объявления"
     icon = "fa-solid fa-store"
 
-    column_list = [Listing.id, Listing.external_id, Listing.channel_id, Listing.status, Listing.reported_price_amount, Listing.consecutive_error_count, Listing.updated_at]
-    column_details_list = [Listing.id, Listing.external_id, Listing.channel_id, Listing.covered_channel_slot_ids, Listing.status, Listing.reported_price_amount, Listing.reported_price_currency, Listing.presentation_title, Listing.last_error_text, Listing.consecutive_error_count, Listing.updated_at]
+    column_list = ["id", "external_id", "channel_id", "status", "reported_price_amount", "consecutive_error_count", "updated_at"]
+    column_details_list = ["id", "external_id", "channel_id", "status", "reported_price_amount", "reported_price_currency", "presentation_title", "last_error_text", "consecutive_error_count", "updated_at"]
 
-    column_searchable_list = [Listing.external_id]
-    column_filters = [Listing.channel_id, Listing.status]
-    column_default_sort = (Listing.updated_at, True)
+    column_searchable_list = ["external_id"]
+    column_filters = ["channel_id", "status"]
+    column_default_sort = ("updated_at", True)  # 🔥 СТРОКА
     page_size = 50
 
     can_create = False
@@ -137,12 +138,12 @@ class SyncStateAdmin(ModelView, model=SyncState):
     name_plural = "Синхронизации"
     icon = "fa-solid fa-arrows-rotate"
 
-    column_list = [SyncState.id, SyncState.channel_id, SyncState.module_declaration_revision, SyncState.executor_state_revision, SyncState.last_sync_at]
-    column_details_list = [SyncState.id, SyncState.channel_id, SyncState.next_cursor, SyncState.module_declaration_revision, SyncState.executor_state_revision, SyncState.last_sync_at, SyncState.created_at]
+    column_list = ["id", "channel_id", "module_declaration_revision", "executor_state_revision", "last_sync_at"]
+    column_details_list = ["id", "channel_id", "next_cursor", "module_declaration_revision", "executor_state_revision", "last_sync_at", "created_at"]
 
     column_searchable_list = []
-    column_filters = [SyncState.channel_id]
-    column_default_sort = (SyncState.last_sync_at, True)
+    column_filters = ["channel_id"]
+    column_default_sort = ("last_sync_at", True)  # 🔥 СТРОКА (Именно здесь была ошибка!)
     page_size = 25
 
     can_create = False
