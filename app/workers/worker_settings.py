@@ -1,4 +1,5 @@
 # app/workers/worker_settings.py
+import logging
 from arq.connections import RedisSettings
 from app.config import settings
 from urllib.parse import urlparse
