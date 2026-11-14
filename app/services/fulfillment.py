@@ -69,24 +69,27 @@ class FulfillmentService:
         
         try:
             # 2. Извлекаем данные товара из заказа
-            # items_data хранится как JSON в модели Order
             items_data = order.items_data or []
             if not items_data:
                 raise ValueError("No items in order data")
             
             # Берем первый товар (обычно один цифровой товар в заказе)
             item = items_data[0]
-            offer_id = item.get("offerId") # Наш SKU (cndk-...)
-            yandex_item_id = item.get("id") # Integer ID товара в заказе (критично!)
+            offer_id = item.get("offerId")       # Наш SKU (cndk-...)
+            yandex_item_id = item.get("id")      # Integer ID товара в заказе (критично!)
+            offer_name = item.get("offerName", "Неизвестная игра") # Название из Яндекс
             
-            # Парсим наш SKU cndk-{game_id}-{variant_id}-{console}-{tier}
-            game_name = await self._get_game_name_by_offer_id(session, offer_id)
             platform, method = self._parse_platform_and_method(offer_id)
             
-            if not game_name:
-                raise ValueError(f"Could not determine game name for offer_id {offer_id}")
+            # Пытаемся найти точное название в нашем локальном каталоге
+            game_name = await self._get_game_name_by_offer_id(session, offer_id)
             
-            logger.info(f"[Fulfillment] Processing item: game={game_name}, platform={platform}, method={method}")
+            # 🔥 FALLBACK: Если в каталоге не нашли, берем название прямо из заказа Яндекса!
+            if not game_name:
+                game_name = offer_name
+                logger.warning(f"[Fulfillment] ⚠️ Catalog item not found for {offer_id}. Fallback to offerName: '{game_name}'")
+            
+            logger.info(f"[Fulfillment] Processing item: game='{game_name}', platform={platform}, method={method}")
             
             # 3. Проверка доступности (CanActivate)
             can_activate_resp = await self.code_client.can_activate(
