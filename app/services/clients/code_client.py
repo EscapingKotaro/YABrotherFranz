@@ -28,7 +28,7 @@ class RealCodeApiClient:
             base_url=self.base_url,
             timeout=httpx.Timeout(30.0, connect=10.0),
             limits=httpx.Limits(max_connections=50, max_keepalive_connections=10),
-            auth=httpx.BasicAuth(username=self.app_key, password=self.app_secret),
+      #      auth=httpx.BasicAuth(username=self.app_key, password=self.app_secret),
             headers={
                 "Content-Type": "application/json",
                 "Accept": "application/json",
@@ -135,8 +135,8 @@ class RealCodeApiClient:
             "taskNumber": task_number,
         }
         
-        if method:
-            payload["method"] = method
+    #    if method:
+   #         payload["method"] = method
         if source_system_name:
             payload["sourceSystemName"] = source_system_name
         else:
