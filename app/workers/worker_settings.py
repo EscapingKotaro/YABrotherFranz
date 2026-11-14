@@ -1,17 +1,22 @@
-# app/workers/worker_settings.py
 import logging
 from arq.connections import RedisSettings
-from app.config import settings
 from urllib.parse import urlparse
 
-
+# 🔥 ЖЕСТКАЯ НАСТРОЙКА ЛОГОВ (ДОЛЖНА БЫТЬ ПЕРВОЙ!)
+# force=True перезаписывает настройки по умолчанию, которые ставит ARQ
 logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    force=True,
+    force=True
 )
 
-# Настройки Redis для ARQ
+# Теперь импортируем наши модули (они подхватят эту настройку)
+from app.config import settings
+from app.workers.catalog_tasks import sync_catalog_task, process_removal_requests_task
+from app.workers.chat_tasks import poll_crm_tasks
+from app.workers.order_tasks import process_order_task
+
+# Парсим REDIS_URL из .env
 parsed = urlparse(settings.redis_url)
 
 redis_settings = RedisSettings(
@@ -21,13 +26,6 @@ redis_settings = RedisSettings(
     password=parsed.password,
 )
 
-# Функции, которые будут выполняться воркерами
-# Импортируем здесь, чтобы ARQ мог их найти
-from app.workers.catalog_tasks import sync_catalog_task, process_removal_requests_task
-from app.workers.chat_tasks import poll_crm_tasks
-from app.workers.order_tasks import process_order_task
-
-# Список всех задач
 WORKER_FUNCTIONS = [
     sync_catalog_task,
     process_removal_requests_task,
@@ -35,15 +33,10 @@ WORKER_FUNCTIONS = [
     process_order_task,
 ]
 
-# Настройки воркера (используются при запуске `arq app.workers.worker_settings.WorkerSettings`)
 class WorkerSettings:
     functions = WORKER_FUNCTIONS
     redis_settings = redis_settings
-    
-    # Таймауты и retry
-    job_timeout = 300  # 5 минут
+    job_timeout = 300
     retry_jobs = True
     max_tries = 3
-    
-    # Health check
     health_check_interval = 10
