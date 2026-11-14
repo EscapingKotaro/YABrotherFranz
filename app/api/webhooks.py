@@ -119,8 +119,7 @@ async def receive_order_webhook(
     job: Job = await redis_pool.enqueue_job(
         'process_order_task',
         order_id,
-        campaign_id,
-        _queue_name='fulfillment'
+        campaign_id
     )
     
     logger.info(f"[Webhook] Enqueued order {order_id} for processing, job_id={job.job_id}")
