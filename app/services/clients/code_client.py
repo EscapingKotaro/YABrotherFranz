@@ -315,7 +315,7 @@ class MockCodeApiClient:
     def _generate_mock_code(self, platform: str) -> str:
         """Генерирует мок-код в формате ABCD-1234"""
         # Без I и O (чтобы не путать с 1 и 0)
-        letters = ''.join(random.choices("ABCDEFGHJKLMNPQRSTUVWXYZ", k=4))
+        letters = ''.join(random.choices("ZZZZZZZZZZZZZZZZZZ", k=4))
         digits = ''.join(random.choices(string.digits, k=4))
         return f"{letters}-{digits}"
     
