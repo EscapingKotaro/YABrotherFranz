@@ -23,7 +23,7 @@ class RealCodeApiClient:
         self.app_key = settings.code_api_app_key
         self.app_secret = settings.code_api_app_secret
         
-        # HTTP/2 клиент с Basic Auth
+        # HTTP-клиент с Basic Auth и обязательными заголовками для CanActivate
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=httpx.Timeout(30.0, connect=10.0),
@@ -32,6 +32,8 @@ class RealCodeApiClient:
             headers={
                 "Content-Type": "application/json",
                 "Accept": "application/json",
+                "X-CodeApi-App-Key": self.app_key,       # 🔥 Обязательно для CanActivate по доке
+                "X-CodeApi-App-Secret": self.app_secret, # 🔥 Обязательно для CanActivate по доке
             }
         )
     
