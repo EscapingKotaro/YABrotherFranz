@@ -22,13 +22,15 @@ class RealCodeApiClient:
         self.base_url = settings.code_api_url.rstrip("/")
         self.app_key = settings.code_api_app_key
         self.app_secret = settings.code_api_app_secret
+        self.app_login = settings.code_api_login
+        self.app_password = settings.code_api_password
         
         # HTTP-клиент с Basic Auth и обязательными заголовками для CanActivate
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=httpx.Timeout(30.0, connect=10.0),
             limits=httpx.Limits(max_connections=50, max_keepalive_connections=10),
-      #      auth=httpx.BasicAuth(username=self.app_key, password=self.app_secret),
+            auth=httpx.BasicAuth(username=self.app_login, password=self.app_password),
             headers={
                 "Content-Type": "application/json",
                 "Accept": "application/json",
