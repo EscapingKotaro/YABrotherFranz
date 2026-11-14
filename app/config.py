@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     code_api_url: str = "https://ps.cyndykshop.su"
     code_api_app_key: str = ""
     code_api_app_secret: str = ""
+    code_api_login: str = ""
+    code_api_password: str = ""
     
     # === CRM API (🔥 НОВОЕ) ===
     crm_api_url: str = "https://chats.systemseller.net"
