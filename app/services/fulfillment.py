@@ -1,6 +1,6 @@
 # app/services/fulfillment.py
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,8 +56,16 @@ class FulfillmentService:
             return {"success": True, "status": "already_delivered"}
         
         # Проверяем дедлайн (30 минут по доке Яндекса)
-        if order.created_at and (datetime.utcnow() - order.created_at) > timedelta(minutes=25):
-            logger.warning(f"[Fulfillment] Order {order_id} is close to deadline!")
+        if order.created_at:
+            now_utc = datetime.now(timezone.utc)
+            created_at_utc = order.created_at
+            
+            # Если время из БД вдруг без часового пояса, делаем его UTC
+            if created_at_utc.tzinfo is None:
+                created_at_utc = created_at_utc.replace(tzinfo=timezone.utc)
+            
+            if (now_utc - created_at_utc) > timedelta(minutes=25):
+                logger.warning(f"[Fulfillment] ⚠️ Order {order_id} is close to deadline!")
         
         try:
             # 2. Извлекаем данные товара из заказа
@@ -126,7 +134,7 @@ class FulfillmentService:
             # 7. Обновляем статус в БД
             order.status = "DELIVERED"
             order.code_value = generated_code
-            order.delivered_at = datetime.utcnow()
+            order.delivered_at = datetime.now(timezone.utc)  # 🔥 ИСПРАВЛЕНО
             await session.commit()
             
             logger.info(f"[Fulfillment] ✅ Order {order_id} successfully delivered with code {generated_code}")
