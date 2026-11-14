@@ -3,6 +3,12 @@ from arq.connections import RedisSettings
 from app.config import settings
 from urllib.parse import urlparse
 
+
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 # Настройки Redis для ARQ
 parsed = urlparse(settings.redis_url)
 
