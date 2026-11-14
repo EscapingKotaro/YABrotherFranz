@@ -7,7 +7,8 @@ from urllib.parse import urlparse
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    force=True,
 )
 
 # Настройки Redis для ARQ
