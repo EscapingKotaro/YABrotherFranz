@@ -100,6 +100,45 @@ class RealYandexClient:
         result = response.json()
         logger.info(f"[YANDEX] ✅ Order {order_id} delivered: {result}")
         return result
+
+
+    @retry_with_backoff(max_retries=3, base_delay=2)
+    async def get_orders2(
+        self,
+        business_id: str,
+        order_ids: list[int],
+        campaign_ids: list[int] = None,
+    ) -> dict:
+        """
+        Получает полную информацию о заказах по их ID.
+        Используем это сразу после получения вебхука ORDER_CREATED.
+        """
+        # Находим аккаунт по business_id для правильных заголовков
+        account = next((acc for acc in settings.yandex_accounts if acc.business_id == business_id), None)
+        if not account:
+            raise ValueError(f"Unknown business_id: {business_id}")
+
+        url = f"/v1/businesses/{business_id}/orders"
+        
+        body = {
+            "orderIds": order_ids
+        }
+        if campaign_ids:
+            body["campaignIds"] = campaign_ids
+
+        logger.info(f"[YANDEX] POST {url} | order_ids={order_ids}")
+
+        response = await self.client.post(
+            url,
+            json=body,
+            headers=self._get_headers(account),
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        orders = result.get("result", {}).get("orders", [])
+        logger.info(f"[YANDEX] 📥 Got {len(orders)} detailed orders")
+        return result
     
     @retry_with_backoff(max_retries=3, base_delay=2)
     async def get_orders(
