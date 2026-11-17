@@ -148,13 +148,13 @@ class RealYandexClient:
     async def get_orders(
         self,
         business_id: str,
-        campaign_ids: list[str],
+        campaign_ids: list,  # Принимаем list, элементы могут быть str или int из FastAPI
         statuses: Optional[list[str]] = None,
         limit: int = 50,
         page_token: Optional[str] = None,
     ) -> dict:
         """
-        Получение списка заказов.
+        Получение списка заказов (используется для кнопок на дашборде).
         
         Args:
             business_id: ID бизнеса
@@ -166,19 +166,34 @@ class RealYandexClient:
         Returns:
             {"result": {"orders": [...], "paging": {"nextPageToken": "..."}}}
         """
-        # Берём первый campaign_id для получения api_key
-        # (обычно все кампании одного бизнеса имеют одинаковый ключ)
-        account = self._get_account(campaign_ids[0])
+        # 1. Надежный поиск аккаунта: сначала по business_id, если не вышло - по первому campaign_id
+        account = next((acc for acc in settings.yandex_accounts if str(acc.business_id) == str(business_id)), None)
+        if not account and campaign_ids:
+            account = next((acc for acc in settings.yandex_accounts if str(acc.campaign_id) == str(campaign_ids[0])), None)
+            
+        if not account:
+            raise ValueError(f"Unknown business_id: {business_id} or campaign_id: {campaign_ids[0] if campaign_ids else 'None'}")
         
         url = f"/v1/businesses/{business_id}/orders"
+        
+        # 2. Query параметры
         params = {"limit": min(limit, 50)}
         if page_token:
             params["pageToken"] = page_token
         
-        payload = {"campaignIds": [int(cid) for cid in campaign_ids], "fake": True}
+        # 3. Body запроса: ЖЕСТКАЯ типизация в int + fake: True
+        payload = {
+            "campaignIds": [int(cid) for cid in campaign_ids],
+            "fake": True  # 🔥 КРИТИЧЕСКИ ВАЖНО, чтобы дашборд видел тестовые заказы
+        }
         
-        logger.debug(f"[YANDEX] POST {url} | campaigns={campaign_ids}, statuses={statuses}")
+        if statuses:
+            payload["statuses"] = statuses
         
+        # 4. Информативное логирование (мы точно увидим, что улетело в Яндекс)
+        logger.info(f"[YANDEX] POST {url} | payload={payload}, params={params}")
+        
+        # 5. Выполнение запроса
         response = await self.client.post(
             url,
             params=params,
@@ -187,9 +202,17 @@ class RealYandexClient:
         )
         response.raise_for_status()
         
+        # 6. Обработка и логирование ответа
         result = response.json()
-        orders_count = len(result.get("result", {}).get("orders", []))
-        logger.info(f"[YANDEX] 📥 Got {orders_count} orders from business {business_id}")
+        orders = result.get("result", {}).get("orders", [])
+        orders_count = len(orders)
+        logger.info(f"result {result}")
+        
+        
+        # Выводим ID полученных заказов, чтобы сразу видеть, сработал ли фильтр
+        returned_ids = [str(o.get("orderId")) for o in orders]
+        logger.info(f"[YANDEX] 📥 Got {orders_count} orders from business {business_id}. IDs: {returned_ids}")
+        
         return result
     
     # ============================================================
