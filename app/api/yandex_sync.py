@@ -42,7 +42,7 @@ async def get_yandex_orders(
         response = await yandex_client.get_orders(
             business_id=account.business_id,
             campaign_ids=[campaign_id],
-            statuses=[status],
+         #   statuses=[status],
             limit=limit,
         )
         
