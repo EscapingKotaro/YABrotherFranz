@@ -121,7 +121,7 @@ class RealYandexClient:
         url = f"/v1/businesses/{business_id}/orders"
         
         body = {
-            "orderIds": order_ids
+            "orderIds": order_ids, "fake": True
         }
         if campaign_ids:
             body["campaignIds"] = campaign_ids
@@ -171,7 +171,7 @@ class RealYandexClient:
         if page_token:
             params["pageToken"] = page_token
         
-        payload = {"campaignIds": [int(cid) for cid in campaign_ids]}
+        payload = {"campaignIds": [int(cid) for cid in campaign_ids], "fake": True}
         if statuses:
             payload["statuses"] = statuses
         
