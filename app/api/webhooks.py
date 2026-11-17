@@ -101,7 +101,7 @@ async def handle_order_created(
     request: Request,
     notification: OrderCreatedNotificationDTO
 ) -> JSONResponse:
-    """Сразу запускаем фулфилмент при создании заказа"""
+    """Запрашиваем полные данные у Яндекса, но не падаем, если их нет"""
     order_id = str(notification.orderId)
     campaign_id = str(notification.campaignId)
     
@@ -115,56 +115,57 @@ async def handle_order_created(
         logger.info(f"[Webhook] Order {order_id} already delivered. Ignoring retry.")
         return JSONResponse(status_code=200, content={"status": "ignored", "reason": "already_delivered"})
     
-    # Если заказ уже в обработке, просто говорим Яндексу "ОК", чтобы он перестал спамить
     if order and order.status in ["PROCESSING", "RECEIVED"]:
         logger.info(f"[Webhook] Order {order_id} is already being processed. Ignoring retry.")
         return JSONResponse(status_code=200, content={"status": "accepted", "reason": "already_queued"})
     
+    # 2. Данные по умолчанию из вебхука (если API Яндекса еще не готов)
+    items_data = [item.model_dump() for item in notification.items]
+    total_amount = 0.0
+    currency = "RUB"
+    created_at = datetime.now(timezone.utc)
+    
+    # 3. 🚀 ПЫТАЕМСЯ получить полные данные у Яндекса (best-effort)
     yandex_client = get_yandex_client()
-    
-    # Находим business_id по campaign_id из конфига
     account = settings.accounts_by_campaign.get(campaign_id)
-    if not account:
-        logger.error(f"[Webhook] Unknown campaign_id: {campaign_id}")
-        raise HTTPException(status_code=400, detail="Unknown campaign")
     
-    try:
-        # Вызываем наш новый метод
-        response = await yandex_client.get_orders2(
-            business_id=account.business_id,
-            order_ids=[int(order_id)],
-            campaign_ids=[int(campaign_id)]
-        )
-        
-        yandex_orders = response.get("result", {}).get("orders", [])
-        if not yandex_orders:
-            raise ValueError(f"Order {order_id} not found in Yandex API response")
-        
-        full_order_data = yandex_orders[0]
-        
-    except Exception as e:
-        logger.error(f"[Webhook] Failed to fetch order details from Yandex: {e}")
-        raise HTTPException(status_code=502, detail="Failed to fetch order from Yandex")
-
-    # 3. Извлекаем нужные поля из полного ответа
-    items_data = full_order_data.get("items", [])
-    total_payment = full_order_data.get("prices", {}).get("payment", {})
-    total_amount = total_payment.get("value", 0.0)
-    currency = total_payment.get("currencyId", "RUB")
+    if account:
+        try:
+            response = await yandex_client.get_orders2(
+                business_id=account.business_id,
+                order_ids=[int(order_id)],
+                campaign_ids=[int(campaign_id)]
+            )
+            
+            yandex_orders = response.get("result", {}).get("orders", [])
+            if yandex_orders:
+                full_order_data = yandex_orders[0]
+                items_data = full_order_data.get("items", items_data)
+                total_payment = full_order_data.get("prices", {}).get("payment", {})
+                total_amount = total_payment.get("value", 0.0)
+                currency = total_payment.get("currencyId", "RUB")
+                
+                creation_date_str = full_order_data.get("creationDate")
+                if creation_date_str:
+                    try:
+                        created_at = datetime.fromisoformat(creation_date_str.replace("Z", "+00:00"))
+                    except Exception:
+                        pass
+                
+                logger.info(f"[Webhook] ✅ Got full order details from Yandex API: {order_id}")
+            else:
+                logger.warning(f"[Webhook] ⚠️ Order {order_id} not yet in Yandex API (eventual consistency). Using webhook data.")
+        except Exception as e:
+            logger.warning(f"[Webhook] ⚠️ Failed to fetch from Yandex API: {e}. Using webhook data.")
+    else:
+        logger.warning(f"[Webhook] ⚠️ Unknown campaign_id: {campaign_id}. Using webhook data.")
     
-    # Парсим дату создания (Яндекс присылает ISO 8601, например "2025-01-01T12:00:00Z")
-    creation_date_str = full_order_data.get("creationDate")
-    try:
-        created_at = datetime.fromisoformat(creation_date_str.replace("Z", "+00:00"))
-    except Exception:
-        created_at = datetime.now(timezone.utc)
-
-    # 4. Создаем или обновляем запись в БД с ПОЛНЫМИ данными
+    # 4. Создаем или обновляем запись в БД
     if not order:
         order = Order(
             order_id=order_id,
             campaign_id=campaign_id,
-            status="PROCESSING", # Сразу в работу
+            status="PROCESSING",
             items_data=items_data,
             total_amount=total_amount,
             currency=currency,
@@ -172,16 +173,15 @@ async def handle_order_created(
         )
         session.add(order)
         await session.commit()
-        logger.info(f"[Webhook] ✅ Created order record with full details: {order_id}, Amount: {total_amount} {currency}")
+        logger.info(f"[Webhook] ✅ Created order record: {order_id}, Amount: {total_amount} {currency}")
     else:
-        # Если запись была, но без деталей (например, из статус-апдейта), обновляем её
         order.items_data = items_data
         order.total_amount = total_amount
         order.currency = currency
         order.status = "PROCESSING"
         await session.commit()
-    
-    # 3. СРАЗУ запускаем задачу на выдачу кода!
+
+    # 5. СРАЗУ запускаем задачу на выдачу кода!
     logger.info(f"[Webhook] 🚀 Enqueueing IMMEDIATE fulfillment for order {order_id}")
     redis_pool = request.app.state.redis_pool
     job: Job = await redis_pool.enqueue_job(
