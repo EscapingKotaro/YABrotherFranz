@@ -106,38 +106,42 @@ class RealYandexClient:
     async def get_orders2(
         self,
         business_id: str,
-        order_ids: list[int],
-        campaign_ids: list[int] = None,
+        order_ids: list,  # Принимаем список, элементы могут быть str или int
+        campaign_ids: list = None,
     ) -> dict:
-        """
-        Получает полную информацию о заказах по их ID.
-        Используем это сразу после получения вебхука ORDER_CREATED.
-        """
-        # Находим аккаунт по business_id для правильных заголовков
-        account = next((acc for acc in settings.yandex_accounts if acc.business_id == business_id), None)
+        account = next((acc for acc in settings.yandex_accounts if str(acc.business_id) == str(business_id)), None)
         if not account:
             raise ValueError(f"Unknown business_id: {business_id}")
 
         url = f"/v1/businesses/{business_id}/orders"
         
+        # 🔥 КРИТИЧЕСКИ ВАЖНО: Жесткое преобразование в int. Яндекс требует integer[], а не string[]!
         body = {
-            "orderIds": order_ids, "fake": True
+            "orderIds": [int(oid) for oid in order_ids],
+            "fake": True
         }
-    #    if campaign_ids:
-  #          body["campaignIds"] = campaign_ids
+        if campaign_ids:
+            body["campaignIds"] = [int(cid) for cid in campaign_ids]
 
-        logger.info(f"[YANDEX] POST {url} | order_ids={order_ids}, fake=True")
+        # 🔥 ЛОГ ДЛЯ ОТЛАДКИ: Мы точно увидим, какой JSON улетает в Яндекс
+        logger.info(f"[YANDEX] POST {url} | body={body}")
 
         response = await self.client.post(
             url,
             json=body,
             headers=self._get_headers(account),
         )
+        
+        # Если Яндекс вернет 400 Bad Request из-за типов, httpx сразу выбросит ошибку здесь
         response.raise_for_status()
         
         result = response.json()
         orders = result.get("result", {}).get("orders", [])
-        logger.info(f"[YANDEX] 📥 Got {len(orders)} detailed orders")
+        
+        # 🔥 ЛОГ ДЛЯ ОТЛАДКИ: Выведем ID заказов, которые реально вернул Яндекс
+        returned_ids = [str(o.get("orderId")) for o in orders]
+        logger.info(f"[YANDEX] 📥 Got {len(orders)} detailed orders. Returned IDs: {returned_ids}")
+        
         return result
     
     @retry_with_backoff(max_retries=3, base_delay=2)
@@ -172,8 +176,6 @@ class RealYandexClient:
             params["pageToken"] = page_token
         
         payload = {"campaignIds": [int(cid) for cid in campaign_ids], "fake": True}
-        if statuses:
-            payload["statuses"] = statuses
         
         logger.debug(f"[YANDEX] POST {url} | campaigns={campaign_ids}, statuses={statuses}")
         
