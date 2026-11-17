@@ -12,6 +12,24 @@
     <div class="container mx-auto px-4 py-8">
         <h1 class="text-3xl font-bold mb-8">Dashboard — Yandex Market Client</h1>
         
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-xl font-bold mb-4"><i class="fa-solid fa-sync"></i> Синхронизация с Яндексом</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <a href="/api/yandex/orders?status=PROCESSING" target="_blank" 
+                   class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded text-center">
+                    <i class="fa-solid fa-cart-shopping"></i> Заказы PROCESSING
+                </a>
+                <a href="/api/yandex/orders?status=DELIVERED" target="_blank"
+                   class="bg-green-500 hover:bg-green-700 text-white font-bold py-3 px-6 rounded text-center">
+                    <i class="fa-solid fa-check-circle"></i> Заказы DELIVERED
+                </a>
+                <a href="/api/yandex/listings?status=published" target="_blank"
+                   class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded text-center">
+                    <i class="fa-solid fa-store"></i> Опубликованные карточки
+                </a>
+            </div>
+        </div>
+        
         <!-- Метрики -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div class="bg-white rounded-lg shadow p-6">

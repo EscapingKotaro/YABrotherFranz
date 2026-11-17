@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from app.config import settings
 from app.database import init_db
 from app.api.webhooks import router as webhooks_router
+from app.api.yandex_sync import router as yandex_sync_router
 from app.admin.sqladmin_setup import setup_admin
 from app.admin.dashboard import router as dashboard_router
 
@@ -57,6 +58,7 @@ app = FastAPI(
 
 # Подключаем роутеры
 app.include_router(webhooks_router)
+app.include_router(yandex_sync_router)
 app.include_router(dashboard_router)
 
 # Подключаем админку
