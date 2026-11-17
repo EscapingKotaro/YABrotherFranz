@@ -137,7 +137,7 @@ async def handle_order_created(
                 campaign_ids=[int(campaign_id)]
             )
             
-            yandex_orders = response.get("result", {}).get("orders", [])
+            yandex_orders = response.get("orders", [])
             if yandex_orders:
                 full_order_data = yandex_orders[0]
                 items_data = full_order_data.get("items", items_data)
