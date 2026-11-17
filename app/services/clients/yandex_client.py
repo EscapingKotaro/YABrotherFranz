@@ -97,6 +97,7 @@ class RealYandexClient:
             json=payload,
             headers=self._get_headers(account),
         )
+        logger.info(f"[YANDEX] Order {order_id}: {response.json()}")
         response.raise_for_status()
         
         result = response.json()
