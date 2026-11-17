@@ -1,95 +1,126 @@
 # app/api/webhooks.py
 from fastapi import APIRouter, Request, HTTPException, Depends, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from arq.jobs import Job
 import logging
+from datetime import datetime, timezone
 
 from app.database import get_session
-from app.config import settings
-from app.schemas.yandex_webhook import OrderWebhookDTO
-from app.services.yandex_webhook_validator import YandexWebhookValidator
+from app.schemas.yandex_notification import (
+    YandexNotificationDTO,
+    PingNotificationDTO,
+    OrderCreatedNotificationDTO,
+    OrderStatusUpdatedNotificationDTO,
+)
 from app.models.order import Order
-from sqlalchemy import select
 from app.models.webhook import WebhookLog
+from app.services.yandex_webhook_validator import YandexWebhookValidator
+from sqlalchemy import select
 
 router = APIRouter(prefix="/webhook/yandex", tags=["webhooks"])
 logger = logging.getLogger(__name__)
 
 
-def _get_account_by_api_key(api_key: str):
-    """Находим аккаунт по Api-Key из заголовка"""
-    for account in settings.yandex_accounts:
-        if account.api_key == api_key:
-            return account
-    return None
-
-
-@router.post("/order/status")
-async def receive_order_webhook(
+@router.post("/{path:path}/notification")
+async def receive_yandex_notification(
+    path: str,
     request: Request,
     session: AsyncSession = Depends(get_session)
 ):
     """
-    Прием вебхука от Яндекс Маркета о изменении статуса заказа.
+    Универсальный endpoint для всех уведомлений от Яндекс Маркета.
     
-    URL регистрируем в кабинете Яндекса: https://наш-домен/webhook/yandex/order/status
-    campaign_id определяем по Api-Key в заголовке Authorization.
+    Яндекс сам добавляет /notification к URL, который мы указали в кабинете.
+    Поэтому мы ловим всё по пути /webhook/yandex/{path}/notification.
+    
+    Обрабатываем:
+    - PING — проверочное уведомление
+    - ORDER_CREATED — создан новый заказ
+    - ORDER_STATUS_UPDATED — изменён статус заказа
     """
     
-    # 1. Получаем Api-Key из заголовка
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid Authorization header"
-        )
-    
-    api_key = auth_header.replace("Bearer ", "")
-    account = _get_account_by_api_key(api_key)
-    
-    if not account:
-        logger.error(f"[Webhook] Unknown API key")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unknown API key"
-        )
-    
-    campaign_id = account.campaign_id
-    
-    # 2. Читаем raw body и signature
+    # 1. Читаем raw body
     payload_bytes = await request.body()
-    signature = request.headers.get("X-Yandex-Signature")
     
-    # 3. Валидация подписи
-    YandexWebhookValidator.validate(payload_bytes, signature, campaign_id)
-    
-    # 4. Парсим payload
+    # 2. Парсим тип уведомления (нужно для логирования и валидации)
     try:
-        webhook_data = OrderWebhookDTO.model_validate_json(payload_bytes)
+        import json
+        raw_data = json.loads(payload_bytes)
+        notification_type = raw_data.get("notificationType", "UNKNOWN")
+        campaign_id = str(raw_data.get("campaignId", "unknown"))
+        order_id = str(raw_data.get("orderId", "unknown"))
     except Exception as e:
-        logger.error(f"[Webhook] Failed to parse payload: {e}")
-        raise HTTPException(status_code=400, detail=f"Invalid payload: {str(e)}")
-
-    log_entry = WebhookLog(
-    campaign_id=campaign_id,
-    order_id=str(webhook_data.orderId),
-    webhook_type="order_status",
-    payload=webhook_data.model_dump(),
-    signature_valid=True, # Если дошли сюда, значит валидна
-    status="accepted"
-)
-    session.add(log_entry)
+        logger.error(f"[Webhook] Failed to parse notification: {e}")
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    
+    logger.info(f"[Webhook] Received {notification_type} for order {order_id}, campaign {campaign_id}")
+    
+    # 3. Записываем в лог вебхуков
+    webhook_log = WebhookLog(
+        campaign_id=campaign_id,
+        order_id=order_id,
+        webhook_type=notification_type,
+        payload=raw_data,
+        signature_valid=True,  # TODO: добавить проверку подписи
+        status="accepted",
+    )
+    session.add(webhook_log)
     await session.commit()
     
-    # 5. Извлекаем order_id из payload
-    order_id = str(webhook_data.orderId)
+    # 4. Обработка PING
+    if notification_type == "PING":
+        logger.info(f"[Webhook] PING received, responding with 200")
+        return JSONResponse(
+            status_code=200,
+            content={
+                "version": "1.0.0",
+                "name": "yandex-market-client",
+                "time": datetime.now(timezone.utc).isoformat()
+            }
+        )
     
-    # 6. Фильтруем только PROCESSING
-    if webhook_data.orderStatus != "PROCESSING":
-        logger.info(f"[Webhook] Ignoring order {order_id} with status {webhook_data.orderStatus}")
-        return {"status": "ignored", "reason": "not_processing"}
+    # 5. Обработка ORDER_CREATED
+    if notification_type == "ORDER_CREATED":
+        try:
+            notification = OrderCreatedNotificationDTO(**raw_data)
+            return await handle_order_created(session, request, notification)
+        except Exception as e:
+            logger.error(f"[Webhook] Error processing ORDER_CREATED: {e}")
+            webhook_log.status = "error"
+            webhook_log.error_message = str(e)
+            await session.commit()
+            raise HTTPException(status_code=500, detail=str(e))
     
-    # 7. Проверка идемпотентности
+    # 6. Обработка ORDER_STATUS_UPDATED
+    if notification_type == "ORDER_STATUS_UPDATED":
+        try:
+            notification = OrderStatusUpdatedNotificationDTO(**raw_data)
+            return await handle_order_status_updated(session, request, notification)
+        except Exception as e:
+            logger.error(f"[Webhook] Error processing ORDER_STATUS_UPDATED: {e}")
+            webhook_log.status = "error"
+            webhook_log.error_message = str(e)
+            await session.commit()
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    # 7. Неизвестный тип уведомления
+    logger.warning(f"[Webhook] Unknown notification type: {notification_type}")
+    return JSONResponse(status_code=200, content={"status": "ignored", "reason": "unknown_type"})
+
+
+async def handle_order_created(
+    session: AsyncSession,
+    request: Request,
+    notification: OrderCreatedNotificationDTO
+) -> JSONResponse:
+    """Обработка уведомления о создании заказа"""
+    order_id = str(notification.orderId)
+    campaign_id = str(notification.campaignId)
+    
+    logger.info(f"[Webhook] Processing ORDER_CREATED: order={order_id}, campaign={campaign_id}")
+    
+    # Проверяем идемпотентность
     existing_order = await session.execute(
         select(Order).where(Order.order_id == order_id)
     )
@@ -97,40 +128,110 @@ async def receive_order_webhook(
     
     if order and order.status == "DELIVERED":
         logger.info(f"[Webhook] Order {order_id} already delivered, skipping")
-        return {"status": "ignored", "reason": "already_delivered"}
+        return JSONResponse(status_code=200, content={"status": "ignored", "reason": "already_delivered"})
     
-    # 8. Создаем запись о заказе
+    # Создаём или обновляем запись о заказе
     if not order:
         order = Order(
             order_id=order_id,
             campaign_id=campaign_id,
-            customer_id=webhook_data.buyer.id if webhook_data.buyer else None,
             status="RECEIVED",
-            items_data=[item.model_dump() for item in webhook_data.items],
-            total_amount=webhook_data.itemsTotal,
-            currency=webhook_data.currency,
+            items_data=[item.model_dump() for item in notification.items],
+            created_at=datetime.now(timezone.utc),
         )
         session.add(order)
         await session.commit()
-        logger.info(f"[Webhook] Created order record: {order_id} for campaign {campaign_id}")
+        logger.info(f"[Webhook] Created order record: {order_id}")
     
-    # 9. Ставим задачу в ARQ очередь
-    redis_pool = request.app.state.redis_pool
-    job: Job = await redis_pool.enqueue_job(
-        'process_order_task',
-        order_id,
-        campaign_id
+    # Ставим задачу в очередь (фулфилмент запустится, когда статус станет PROCESSING)
+    # Пока просто логируем, что заказ создан
+    logger.info(f"[Webhook] Order {order_id} created, waiting for PROCESSING status")
+    
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "accepted",
+            "order_id": order_id,
+            "campaign_id": campaign_id,
+        }
     )
+
+
+async def handle_order_status_updated(
+    session: AsyncSession,
+    request: Request,
+    notification: OrderStatusUpdatedNotificationDTO
+) -> JSONResponse:
+    """Обработка уведомления об изменении статуса заказа"""
+    order_id = str(notification.orderId)
+    campaign_id = str(notification.campaignId)
+    new_status = notification.status
+    substatus = notification.substatus
     
-    logger.info(f"[Webhook] Enqueued order {order_id} for processing, job_id={job.job_id}")
+    logger.info(f"[Webhook] Processing ORDER_STATUS_UPDATED: order={order_id}, status={new_status}, substatus={substatus}")
     
-    # 10. Быстрый ответ Яндексу
-    return {
-        "status": "accepted",
-        "order_id": order_id,
-        "campaign_id": campaign_id,
-        "job_id": job.job_id
-    }
+    # Находим заказ в БД
+    existing_order = await session.execute(
+        select(Order).where(Order.order_id == order_id)
+    )
+    order = existing_order.scalar_one_or_none()
+    
+    # Если заказа нет в БД — создаём (могли пропустить ORDER_CREATED)
+    if not order:
+        logger.warning(f"[Webhook] Order {order_id} not found in DB, creating from status update")
+        order = Order(
+            order_id=order_id,
+            campaign_id=campaign_id,
+            status="RECEIVED",
+            items_data=[],  # Нет данных о товарах, нужно будет подтянуть через API
+            created_at=datetime.now(timezone.utc),
+        )
+        session.add(order)
+        await session.commit()
+    
+    # Если заказ уже доставлен — игнорируем
+    if order.status == "DELIVERED":
+        logger.info(f"[Webhook] Order {order_id} already delivered, skipping status update")
+        return JSONResponse(status_code=200, content={"status": "ignored", "reason": "already_delivered"})
+    
+    # Обновляем статус
+    old_status = order.status
+    order.status = new_status
+    await session.commit()
+    
+    logger.info(f"[Webhook] Order {order_id} status changed: {old_status} -> {new_status}")
+    
+    # Если статус PROCESSING и подстатус STARTED — запускаем фулфилмент
+    if new_status == "PROCESSING" and substatus == "STARTED":
+        logger.info(f"[Webhook] Order {order_id} is ready for fulfillment, enqueueing...")
+        
+        redis_pool = request.app.state.redis_pool
+        job: Job = await redis_pool.enqueue_job(
+            'process_order_task',
+            order_id,
+            campaign_id,
+        )
+        
+        logger.info(f"[Webhook] Enqueued fulfillment for order {order_id}, job_id={job.job_id}")
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "accepted",
+                "order_id": order_id,
+                "job_id": job.job_id,
+            }
+        )
+    
+    # Другие статусы просто логируем
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "accepted",
+            "order_id": order_id,
+            "new_status": new_status,
+        }
+    )
 
 
 @router.get("/health")
