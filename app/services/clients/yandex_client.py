@@ -88,7 +88,9 @@ class RealYandexClient:
         payload = {"items": items}
         
         logger.info(f"[YANDEX] POST {url} | items_count={len(items)}")
-        logger.debug(f"[YANDEX] Payload: {payload}")
+        # 🔥 ЭТОТ ЛОГ ПОКАЖЕТ НАМ ПРАВДУ: есть ли там "id": null
+        logger.info(f"[YANDEX] 🔥 EXACT PAYLOAD BEING SENT: {json.dumps(payload, ensure_ascii=False)}")
+        
         
         response = await self.client.post(
             url,
