@@ -123,10 +123,10 @@ class RealYandexClient:
         body = {
             "orderIds": order_ids, "fake": True
         }
-        if campaign_ids:
-            body["campaignIds"] = campaign_ids
+    #    if campaign_ids:
+  #          body["campaignIds"] = campaign_ids
 
-        logger.info(f"[YANDEX] POST {url} | order_ids={order_ids}")
+        logger.info(f"[YANDEX] POST {url} | order_ids={order_ids}, fake=True")
 
         response = await self.client.post(
             url,
