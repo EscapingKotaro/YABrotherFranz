@@ -44,7 +44,7 @@ class RealYandexClient:
     def _get_headers(self, account: YandexAccountConfig) -> dict:
         """Формирование заголовков с нужным api_key"""
         return {
-            "Authorization": f"Bearer {account.api_key}",
+            "Api-Key": f"{account.api_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
