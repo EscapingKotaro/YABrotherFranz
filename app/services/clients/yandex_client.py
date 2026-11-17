@@ -136,7 +136,7 @@ class RealYandexClient:
         response.raise_for_status()
         
         result = response.json()
-        orders = result.get("result", {}).get("orders", [])
+        orders = result.get("orders", [])
         
         # 🔥 ЛОГ ДЛЯ ОТЛАДКИ: Выведем ID заказов, которые реально вернул Яндекс
         returned_ids = [str(o.get("orderId")) for o in orders]
@@ -204,9 +204,8 @@ class RealYandexClient:
         
         # 6. Обработка и логирование ответа
         result = response.json()
-        orders = result.get("result", {}).get("orders", [])
+        orders = result.get("orders", [])
         orders_count = len(orders)
-        logger.info(f"result {result}")
         
         
         # Выводим ID полученных заказов, чтобы сразу видеть, сработал ли фильтр
