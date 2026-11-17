@@ -401,6 +401,60 @@ class RealYandexClient:
         result = response.json()
         logger.info(f"[YANDEX] ✅ Stocks updated")
         return result
+
+    @retry_with_backoff(max_retries=3, base_delay=2)
+    async def get_offer_mappings(
+        self,
+        business_id: str,
+        limit: int = 100,
+        page_token: Optional[str] = None,
+        card_statuses: Optional[list[str]] = None,
+        archived: bool = False,
+    ) -> dict:
+        """
+        Список товаров в каталоге Яндекса (offer-mappings).
+        Показывает реальные карточки на витрине ЛК.
+
+        Args:
+            business_id: ID кабинета
+            limit: до 100 на страницу
+            page_token: токен пагинации
+            card_statuses: фильтр по статусам карточек (HAS_CARD_*, NO_CARD_*)
+            archived: true — из архива
+        """
+        account = None
+        for acc in settings.yandex_accounts:
+            if acc.business_id == business_id:
+                account = acc
+                break
+        if not account:
+            raise ValueError(f"Unknown business_id: {business_id}")
+
+        url = f"/v2/businesses/{business_id}/offer-mappings"
+        params = {"limit": min(limit, 100)}
+        if page_token:
+            params["pageToken"] = page_token
+
+        body: dict = {}
+        if archived:
+            body["archived"] = True
+        if card_statuses:
+            body["cardStatuses"] = card_statuses
+
+        logger.info(f"[YANDEX] POST {url} | statuses={card_statuses}")
+
+        response = await self.client.post(
+            url,
+            params=params,
+            json=body if body else None,
+            headers=self._get_headers(account),
+        )
+        response.raise_for_status()
+
+        result = response.json()
+        items = result.get("result", {}).get("offerMappings", [])
+        logger.info(f"[YANDEX] 📥 Got {len(items)} offer-mappings")
+        return result
     
     async def close(self):
         """Закрытие HTTP-клиента"""
