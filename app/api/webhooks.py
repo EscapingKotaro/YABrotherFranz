@@ -15,6 +15,7 @@ from app.models.order import Order
 from app.models.webhook import WebhookLog
 from sqlalchemy import select
 from app.services.clients.factory import get_yandex_client
+from app.config import settings
 
 router = APIRouter(prefix="/webhook/yandex", tags=["webhooks"])
 logger = logging.getLogger(__name__)
