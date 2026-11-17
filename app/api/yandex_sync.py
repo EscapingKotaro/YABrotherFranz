@@ -44,9 +44,10 @@ async def get_yandex_orders(
             campaign_ids=[campaign_id],
          #   statuses=[status],
             limit=limit,
+            
         )
         
-        orders = response.get("result", {}).get("orders", [])
+        orders = response.get("orders", [])
         
         return {
             "success": True,
