@@ -182,7 +182,8 @@ async def handle_order_created(
         await session.commit()
 
     # 5. СРАЗУ запускаем задачу на выдачу кода!
-    logger.info(f"[Webhook] 🚀 Enqueueing IMMEDIATE fulfillment for order {order_id}")
+    logger.info(f"[Webhook] 🚀 Enqueueing 'process_order_task' with args: order_id={order_id}, campaign_id={campaign_id}")
+    
     redis_pool = request.app.state.redis_pool
     job: Job = await redis_pool.enqueue_job(
         'process_order_task',
