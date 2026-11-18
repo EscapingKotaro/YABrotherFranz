@@ -77,7 +77,7 @@ class CatalogSyncService:
         return {"success": True, "channels": [ch["id"] for ch in channels]}
     
     async def sync_channel(self, session: AsyncSession, channel_id: int) -> dict:
-        """Основной цикл синхронизации канала"""
+        """Основной цикл синхронизации канала с пагинацией для Снайперского режима"""
         logger.info(f"[CatalogSync] 🎯 Starting SNIPER MODE sync for channel {channel_id}")
         logger.info(f"[CatalogSync] Allowed IDs: {ALLOWED_POSITIONS}")
         
@@ -89,31 +89,45 @@ class CatalogSyncService:
             return {"success": False, "error": "SyncState not found"}
         
         cursor = sync_state.next_cursor
+        target_slots = []
+        total_scanned = 0
         
-        slots_response = await self.cndk_client.get_slots(
-            channel_id=channel_id,
-            cursor=cursor,
-            wait=0, # 0 для ручного триггера, чтобы не ждать 30 сек
-            presentation=True,
-        )
+        # 🔥 ЦИКЛ ПАГИНАЦИИ: Ищем наши целевые слоты по всем страницам
+        while True:
+            slots_response = await self.cndk_client.get_slots(
+                channel_id=channel_id,
+                cursor=cursor,
+                wait=0, # 0 для ручного триггера
+                presentation=True,
+            )
+            
+            slots = slots_response.get("slots", [])
+            total_scanned += len(slots)
+            next_cursor = slots_response.get("next_cursor")
+            
+            # Фильтруем целевые слоты из текущей страницы
+            for s in slots:
+                if str(s.get("sellable_position_id")) in ALLOWED_POSITIONS:
+                    target_slots.append(s)
+            
+            # Если нашли все 12 целей, можно остановить поиск досрочно (оптимизация)
+            if len(target_slots) == len(ALLOWED_POSITIONS):
+                logger.info(f"[CatalogSync] 🎯 Found all {len(target_slots)} target slots early!")
+                break
+                
+            if not next_cursor:
+                break
+            cursor = next_cursor
         
-        all_slots = slots_response.get("slots", [])
-        next_cursor = slots_response.get("next_cursor")
+        logger.info(f"[CatalogSync] 📥 Scanned {total_scanned} total slots, found {len(target_slots)} TARGET slots")
         
-        # 🔥 ФИЛЬТРАЦИЯ: Оставляем только снайперские цели
-        target_slots = [
-            s for s in all_slots 
-            if str(s.get("sellable_position_id")) in ALLOWED_POSITIONS
-        ]
-        
-        logger.info(f"[CatalogSync] 📥 Got {len(all_slots)} total slots, filtered to {len(target_slots)} TARGET slots")
-        
+        # Обновляем курсор в БД на последний полученный
         sync_state.next_cursor = next_cursor
         sync_state.last_sync_at = datetime.now(timezone.utc)
         await session.commit()
         
         if not target_slots:
-            logger.debug(f"[CatalogSync] No target slots to process")
+            logger.warning(f"[CatalogSync] ⚠️ No target slots found in the entire catalog!")
             return {"success": True, "processed": 0}
         
         stats = {"created": 0, "updated": 0, "withdrawn": 0, "errors": 0}
