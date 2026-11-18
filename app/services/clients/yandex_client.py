@@ -381,10 +381,16 @@ class RealYandexClient:
             json=payload,
             headers=self._get_headers(account),
         )
-        response.raise_for_status()
+        response_text = response.text
+        logger.info(f"[YANDEX] 🔥 RESPONSE STATUS: {response.status_code}")
+        logger.info(f"[YANDEX] 🔥 RESPONSE BODY: {response_text}")
         
         result = response.json()
-        logger.info(f"[YANDEX] ✅ Offer mappings updated: {result}")
+        if result.get("status") == "ERROR":
+            logger.error(f"[YANDEX] ❌ API returned ERROR inside 200 OK: {result.get('results')}")
+            raise ValueError(f"Yandex API Error: {result.get('results')}")
+            
+        logger.info(f"[YANDEX] ✅ Offer mappings update successful")
         return result
     
     @retry_with_backoff(max_retries=3, base_delay=2)
