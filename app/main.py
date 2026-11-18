@@ -11,6 +11,7 @@ from app.config import settings
 from app.database import init_db, engine
 from app.api.webhooks import router as webhooks_router
 from app.api.yandex_sync import router as yandex_sync_router
+from app.api.sync_api import router as sync_api_router
 from app.admin.sqladmin_setup import setup_admin
 from app.admin.dashboard import router as dashboard_router
 
@@ -54,6 +55,7 @@ app.add_middleware(
 
 app.include_router(webhooks_router)
 app.include_router(yandex_sync_router)
+app.include_router(sync_api_router)
 app.include_router(dashboard_router)
 
 setup_admin(app)
