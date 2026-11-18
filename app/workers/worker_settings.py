@@ -12,7 +12,7 @@ logging.basicConfig(
 
 # Теперь импортируем наши модули (они подхватят эту настройку)
 from app.config import settings
-from app.workers.catalog_tasks import sync_catalog_task, process_removal_requests_task
+#from app.workers.catalog_tasks import sync_catalog_task, process_removal_requests_task
 from app.workers.chat_tasks import poll_crm_tasks
 from app.workers.order_tasks import process_order_task
 
@@ -27,8 +27,8 @@ redis_settings = RedisSettings(
 )
 
 WORKER_FUNCTIONS = [
-    sync_catalog_task,
-    process_removal_requests_task,
+  #  sync_catalog_task,
+  #  process_removal_requests_task,
     poll_crm_tasks,
     process_order_task,
 ]
