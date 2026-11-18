@@ -115,7 +115,7 @@ class CatalogSyncService:
                 logger.info(f"[CatalogSync] 🎯 Found all {len(target_slots)} target slots early!")
                 break
                 
-            if not next_cursor:
+            if not next_cursor or next_cursor==cursor:
                 break
             cursor = next_cursor
         
