@@ -21,6 +21,8 @@ def search_all_slots():
 
     while True:
         page += 1
+        if page>=340:
+            break
         params = {"channel_id": CHANNEL_ID, "limit": 100}
         if cursor:
             params["cursor"] = cursor
