@@ -1,9 +1,12 @@
 # app/api/sync_api.py
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 from typing import Optional
 
+from app.database import get_session
 from app.config import settings
+from app.services.catalog_sync import CatalogSyncService
 from app.services.clients.factory import get_cndk_client
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
@@ -52,4 +55,32 @@ async def get_cndk_slots(
         }
     except Exception as e:
         logger.error(f"[SyncAPI] Error fetching CNDK slots: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/trigger")
+async def trigger_sync(
+    channel_id: int,
+    session: AsyncSession = Depends(get_session)
+):
+    """Ручной запуск синхронизации конкретного канала CNDK -> Яндекс"""
+    try:
+        sync_service = CatalogSyncService()
+        
+        # 1. Инициализация (если нужно)
+        await sync_service.initialize_module(session)
+        
+        # 2. Синхронизация (Снайперский режим внутри)
+        result = await sync_service.sync_channel(session, channel_id)
+        
+        # 3. Обработка запросов на снятие
+        removal_result = await sync_service.process_removal_requests(session, channel_id)
+        
+        return {
+            "success": True,
+            "channel_id": channel_id,
+            "sync_result": result,
+            "removal_result": removal_result
+        }
+    except Exception as e:
+        logger.error(f"[SyncAPI] Error triggering sync: {e}")
         raise HTTPException(status_code=500, detail=str(e))
