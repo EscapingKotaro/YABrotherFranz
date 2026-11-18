@@ -259,7 +259,7 @@ class CatalogSyncService:
             presentation_text=description,
             presentation_images=pictures,
         )
-        session.add(listing the listing) # Ошибка в синтаксисе, исправляю: session.add(listing)
+        session.add(listing)
         await session.commit()
         
         return {
