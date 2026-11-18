@@ -79,7 +79,7 @@ class FulfillmentService:
             yandex_item_id = item.get("id")      # Integer ID товара в заказе (критично!)
             offer_name = item.get("offerName", "Неизвестная игра") # Название из Яндекс
             
-            platform, method = self._parse_platform_and_method(offer_id)
+            platform, method = self._parse_platform_and_method(offer_id, game_name)
             
             # Пытаемся найти точное название в нашем локальном каталоге
             game_name = await self._get_game_name_by_offer_id(session, offer_id)
@@ -117,7 +117,7 @@ class FulfillmentService:
             logger.info(f"[Fulfillment] Code issued: {generated_code}")
             
             # 5. Формируем payload для Яндекса
-            slip_text = self._generate_slip_text(generated_code)
+            slip_text = self._generate_slip_text(generated_code,campaign_id)
             activate_till = (datetime.now() + timedelta(days=14)).strftime('%Y-%m-%d')
             
             yandex_items = [{
@@ -150,31 +150,42 @@ class FulfillmentService:
             await session.commit()
             raise e
     
-    def _parse_platform_and_method(self, offer_id: str) -> tuple[str, str]:
+    def _parse_platform_and_method(self, offer_id: str, game_name: str = "") -> tuple[str, str]:
         """
-        Парсит platform и method из нашего SKU формата cndk-{...}-{console}-{tier}
+        Парсит platform и method. 
+        Гарантирует возврат строго: "Nintendo", "PlayStation", "Xbox" или "Other" для Code API.
         """
-        parts = offer_id.split("-")
-        console = parts[-2].lower() if len(parts) >= 2 else ""
-        tier = parts[-1].lower() if len(parts) >= 1 else ""
+        offer_lower = offer_id.lower()
+        name_lower = game_name.lower()
         
-        # Маппинг на Code API платформы
-        if "ps" in console:
+        # 1. Приоритет: парсим из нашего offer_id (формат: cndk-...-ps5-p2 и т.д.)
+        if "ps" in offer_lower or "playstation" in offer_lower:
             platform = "PlayStation"
-            method = "P3" if "prem" in tier else "P2"
-        elif "switch" in console:
+            method = "P3" if "prem" in offer_lower or "premium" in offer_lower else "P2"
+        elif "switch" in offer_lower or "nintendo" in offer_lower or "nint" in offer_lower:
             platform = "Nintendo"
-            method = "Prem" if "prem" in tier else "Normal"
-        elif "xbox" in console:
+            method = "Prem" if "prem" in offer_lower or "premium" in offer_lower else "Normal"
+        elif "xbox" in offer_lower:
             platform = "Xbox"
-            method = "Prem" if "prem" in tier else "Normal"
-        elif "steam" in console:
-            platform = "Steam"
-            method = "Prem" if "prem" in tier else "Normal"
-        else:
-            platform = "Other"
+            method = "Prem" if "prem" in offer_lower or "premium" in offer_lower else "Normal"
+        elif "steam" in offer_lower or "pc" in offer_lower:
+            platform = "Other" # Code API принимает Other для ПК/Steam, если нет отдельного enum
             method = "Normal"
-            
+        else:
+            # 2. Фолбэк: парсим из названия игры, пришедшего от Яндекса
+            if "nintendo" in name_lower or "switch" in name_lower:
+                platform = "Nintendo"
+                method = "Normal"
+            elif "playstation" in name_lower or "ps4" in name_lower or "ps5" in name_lower:
+                platform = "PlayStation"
+                method = "P2"
+            elif "xbox" in name_lower:
+                platform = "Xbox"
+                method = "Normal"
+            else:
+                platform = "Other"
+                method = "Normal"
+                
         return platform, method
     
     async def _get_game_name_by_offer_id(self, session: AsyncSession, offer_id: str) -> Optional[str]:
@@ -197,11 +208,20 @@ class FulfillmentService:
         # Но лучше хранить маппинг offer_id -> game_name в отдельной таблице
         return None
     
-    def _generate_slip_text(self, code: str) -> str:
+    def _generate_slip_text(self, code: str, campaign_id: str) -> str:
         """
         Генерирует HTML-инструкцию для письма Яндекса.
+        Ссылка захардкожена в зависимости от campaign_id.
         """
-        portal_url = settings.ACTIVATION_PORTAL_URL if hasattr(settings, 'ACTIVATION_PORTAL_URL') else "https://systemseller.net/"
+        cid = str(campaign_id)
+        
+       
+        if cid == "148878241":  
+            portal_url = "https://activation.playtown.su/"
+        elif cid == "148926765":  
+            portal_url = "https://systemseller.net/" 
+        else:
+            portal_url = "https://systemseller.net/"
         
         return f"""
         <p>Спасибо за покупку!</p>
