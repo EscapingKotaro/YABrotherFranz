@@ -41,10 +41,14 @@ def search_all_slots():
 
         slots = data.get("slots", [])
         total_scanned += len(slots)
+        abu=0
 
         # Ищем нужные игры
         for slot in slots:
             name = slot.get("product_name", "").lower()
+            if abu==0:
+                print(f"first name {name}")
+                abu=1
             variant_name = slot.get("product_variant_name", "").lower()
 
             if any(term in name or term in variant_name for term in SEARCH_TERMS):
@@ -60,6 +64,7 @@ def search_all_slots():
                 })
 
         print(f"Просмотрено {len(slots)} слотов. Всего найдено: {len(found_games)}")
+        print(f"nex_cursor {data.get("next_cursor")}")
 
         # Проверяем, есть ли следующая страница
         next_cursor = data.get("next_cursor")
