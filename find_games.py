@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Скрипт проходит по ВСЕМ страницам каталога CNDK и ищет игры по названию.
+Скрипт проходит по ВСЕМ страницам каталога через наш локальный API
+и ищет игры по названию (GTA, FIFA и т.д.).
 """
 import requests
 import json
-import sys
 
-API_URL = "https://auto-posting.cyndykshop.su/api/v1/channels/15/positions"
-API_KEY = "apm_6MO6lji_SfLwg8VqafXq07Zor2P2WzSkk-gcCwU-TLU"
+# Используем наш локальный API, который уже настроен на работу с CNDK
+LOCAL_API_URL = "http://127.0.0.1:8090/api/sync/cndk-slots"
+CHANNEL_ID = 15
 
 # Что ищем (регистронезависимо)
 SEARCH_TERMS = ["gta", "grand theft", "fifa", "ea sports fc", "fc 24", "fc 25", "fc 26"]
@@ -18,25 +19,24 @@ def search_all_slots():
     found_games = []
     total_scanned = 0
 
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-
     while True:
         page += 1
-        params = {"limit": 100}
+        params = {"channel_id": CHANNEL_ID, "limit": 100}
         if cursor:
             params["cursor"] = cursor
 
         print(f"[Страница {page}] Запрашиваю слоты...", end=" ", flush=True)
 
         try:
-            response = requests.get(API_URL, headers=headers, params=params, timeout=30)
+            response = requests.get(LOCAL_API_URL, params=params, timeout=30)
             response.raise_for_status()
             data = response.json()
         except Exception as e:
-            print(f"\n❌ Ошибка запроса: {e}")
+            print(f"\n❌ Ошибка запроса к локальному API: {e}")
+            break
+
+        if not data.get("success"):
+            print(f"\n❌ API вернул ошибку: {data}")
             break
 
         slots = data.get("slots", [])
@@ -59,7 +59,7 @@ def search_all_slots():
                     "target": slot.get("target"),
                 })
 
-        print(f"Просмотрено {len(slots)} слотов. Найдено совпадений: {len(found_games)}")
+        print(f"Просмотрено {len(slots)} слотов. Всего найдено: {len(found_games)}")
 
         # Проверяем, есть ли следующая страница
         next_cursor = data.get("next_cursor")
@@ -71,10 +71,9 @@ def search_all_slots():
 
     return found_games
 
-
 if __name__ == "__main__":
     print(f"🔍 Ищу игры: {SEARCH_TERMS}")
-    print(f"📡 API: {API_URL}\n")
+    print(f"📡 Источник: {LOCAL_API_URL} (channel_id={CHANNEL_ID})\n")
 
     results = search_all_slots()
 
