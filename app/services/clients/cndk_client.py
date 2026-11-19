@@ -62,40 +62,35 @@ class RealCndkClient:
     
     @retry_with_backoff(max_retries=3, base_delay=2)
     async def get_slots(
-        self,
-        channel_id: int,
-        cursor: Optional[str] = None,
-        wait: int = 30,
+        self, 
+        channel_id: int, 
+        cursor: str = None, 
+        wait: int = 0, 
         presentation: bool = True,
+        sellable_position_ids: list = None,
+        publishing_or_covered: bool = True,  # 🔥 НОВЫЙ ПАРАМЕТР
     ) -> dict:
-        """
-        Получить изменённые слоты канала.
+        url = f"/api/v1/channels/{channel_id}/slots"
         
-        Args:
-            channel_id: ID канала
-            cursor: Курсор из предыдущего ответа (None для первого запроса)
-            wait: Сколько секунд ждать изменений (0-30)
-            presentation: Включить оформление слотов
+        params = {
+            "wait": wait,
+            "presentation": str(presentation).lower(),
+            "publishing_or_covered": str(publishing_or_covered).lower(),  # 🔥 ДОБАВЛЯЕМ В ЗАПРОС
+        }
         
-        Returns:
-            {"slots": [...], "next_cursor": "..."}
-        """
-        params = {"wait": wait, "presentation": str(presentation).lower()}
         if cursor:
             params["cursor"] = cursor
+            
+        # httpx автоматически превратит список в ?sellable_position_id=1&sellable_position_id=2
+        if sellable_position_ids:
+            params["sellable_position_id"] = sellable_position_ids
+            
+        # 🔥 ЛОГИРУЕМ ТОЧНЫЕ ПАРАМЕТРЫ, ЧТОБЫ ВИДЕТЬ, ЧТО УЛЕТАЕТ
+        logger.info(f"[CNDK] GET {url} | params={params}")
         
-        logger.debug(f"[CNDK] GET /api/v1/channels/{channel_id}/slots | cursor={cursor}, wait={wait}")
-        
-        response = await self.client.get(
-            f"/api/v1/channels/{channel_id}/slots",
-            params=params,
-        )
+        response = await self.client.get(url, params=params)
         response.raise_for_status()
-        
-        result = response.json()
-        slots_count = len(result.get("slots", []))
-        logger.info(f"[CNDK] 📥 Got {slots_count} slots from channel {channel_id}")
-        return result
+        return response.json()
     
     @retry_with_backoff(max_retries=3, base_delay=2)
     async def read_slot_presentations(
