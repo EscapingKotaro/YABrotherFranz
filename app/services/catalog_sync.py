@@ -200,8 +200,8 @@ class CatalogSyncService:
         external_id = f"cndk-{product_id}-{variant_id}-{console}-{tier_suffix}"
         
         # 🔥 FALLBACK для пустых полей CNDK
-        raw_title = presentation.get("title", "")
-        title = raw_title if raw_title else f"{slot.get('product_name')} ({slot.get('product_variant_name')})"
+        title = slot.get("product_variant_name") or slot.get("product_name")
+
         
         raw_text = presentation.get("text", "")
         description = raw_text if raw_text else "Цифровой ключ активации. Мгновенная доставка на email после оплаты."
@@ -236,14 +236,36 @@ class CatalogSyncService:
         
         # Вызов клиента Яндекса
         try:
-            response = await self.yandex_client.update_offer_mappings(
-                business_id=settings.yandex_accounts[0].business_id, # Берем первый бизнес ID
+            # 1. Создаем/обновляем карточку
+            await self.yandex_client.update_offer_mappings(
+                business_id=settings.yandex_accounts[0].business_id,
                 offer_mappings=[yandex_offer_mapping]
             )
-            logger.info(f"[YANDEX] ✅ Successfully created offer {external_id}")
+            logger.info(f"[YANDEX] ✅ Successfully created/updated offer {external_id}")
+
+            # 2. 🔥 ОТДЕЛЬНО ПРОСТАВЛЯЕМ ЦЕНУ
+            price_value = float(target.get("amount", 0))
+            currency = target.get("currency", "RUB")
+            # Яндекс часто требует именно 'RUR' для валюты, а не 'RUB'
+            yandex_currency = "RUR" if currency == "RUB" else currency
+
+            price_payload = [{
+                "offerId": external_id,
+                "price": {
+                    "value": price_value,
+                    "currencyId": yandex_currency
+                }
+            }]
+
+            await self.yandex_client.update_prices(
+                business_id=settings.yandex_accounts[0].business_id,
+                prices_data=price_payload
+            )
+            logger.info(f"[YANDEX] ✅ Price {price_value} {yandex_currency} set for {external_id}")
+
         except Exception as e:
-            logger.error(f"[YANDEX] ❌ Failed to create offer {external_id}: {e}")
-            raise e # Пробрасываем ошибку, чтобы статистика ошибок обновилась
+            logger.error(f"[YANDEX] ❌ Failed to process offer {external_id}: {e}")
+            raise e
         
         # Сохранение в локальную БД
         catalog_item = CatalogItem(
