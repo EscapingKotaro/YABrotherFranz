@@ -49,6 +49,8 @@ services:
   worker-catalog:
     build: .
     command: arq app.workers.worker_settings.WorkerSettings
+    environment:
+      - WORKER_ROLE=catalog
     env_file:
       - .env
     depends_on:
@@ -61,6 +63,8 @@ services:
   worker-fulfillment:
     build: .
     command: arq app.workers.worker_settings.WorkerSettings
+    environment:
+      - WORKER_ROLE=fulfillment
     env_file:
       - .env
     depends_on:
@@ -73,6 +77,8 @@ services:
   worker-chat:
     build: .
     command: arq app.workers.worker_settings.WorkerSettings
+    environment:
+      - WORKER_ROLE=chat
     env_file:
       - .env
     depends_on:
