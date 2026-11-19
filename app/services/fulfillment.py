@@ -78,16 +78,16 @@ class FulfillmentService:
             offer_id = item.get("offerId")       # Наш SKU (cndk-...)
             yandex_item_id = item.get("id")      # Integer ID товара в заказе (критично!)
             offer_name = item.get("offerName", "Неизвестная игра") # Название из Яндекс
-            
-            platform, method = self._parse_platform_and_method(offer_id, game_name)
-            
             # Пытаемся найти точное название в нашем локальном каталоге
             game_name = await self._get_game_name_by_offer_id(session, offer_id)
-            
+
             # 🔥 FALLBACK: Если в каталоге не нашли, берем название прямо из заказа Яндекса!
             if not game_name:
                 game_name = offer_name
                 logger.warning(f"[Fulfillment] ⚠️ Catalog item not found for {offer_id}. Fallback to offerName: '{game_name}'")
+            platform, method = self._parse_platform_and_method(offer_id, game_name)
+            
+
             
             logger.info(f"[Fulfillment] Processing item: game='{game_name}', platform={platform}, method={method}")
             
