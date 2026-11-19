@@ -262,9 +262,11 @@ class CatalogSyncService:
                 }
             }]
 
+            yandex_campaign_id = settings.yandex_accounts[0].campaign_id
+            
             await self.yandex_client.update_prices(
-                campaign_id=str(channel_id),  # <-- БЫЛО business_id, СТАЛО campaign_id
-                prices=price_payload          # <-- БЫЛО prices_data, СТАЛО prices
+                campaign_id=yandex_campaign_id,  # <-- ТЕПЕРЬ ТУТ "148878241"
+                prices=price_payload
             )
             logger.info(f"[YANDEX] ✅ Price {price_value} {yandex_currency} set for {external_id}")
 
