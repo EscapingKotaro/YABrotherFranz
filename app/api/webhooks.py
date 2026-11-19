@@ -141,7 +141,7 @@ async def handle_order_created(
 
     if account:
         try:
-            response = await yandex_client.get_order_details(
+            response = await yandex_client.get_orders2(
                 business_id=account.business_id,
                 order_ids=[int(order_id)],
                 campaign_ids=[int(campaign_id)],
