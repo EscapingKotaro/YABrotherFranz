@@ -97,8 +97,10 @@ class CatalogSyncService:
             slots_response = await self.cndk_client.get_slots(
                 channel_id=channel_id,
                 cursor=cursor,
-                wait=0, # 0 для ручного триггера
+                wait=0,
                 presentation=True,
+                sellable_position_ids=list(ALLOWED_POSITIONS),
+                publishing_or_covered=True  # 🔥 ДОБАВЛЯЕМ ЭТОТ ФЛАГ
             )
             
             slots = slots_response.get("slots", [])
