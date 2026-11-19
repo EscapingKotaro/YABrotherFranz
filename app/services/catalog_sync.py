@@ -91,7 +91,7 @@ class CatalogSyncService:
         # 🔥 В СНАЙПЕРСКОМ РЕЖИМЕ мы игнорируем сохраненный курсор!
         # Мы хотим найти наши целевые ID прямо сейчас, даже если они не менялись с момента последнего курсора.
         cursor = None 
-        
+
         target_slots = []
         total_scanned = 0
         
@@ -263,8 +263,8 @@ class CatalogSyncService:
             }]
 
             await self.yandex_client.update_prices(
-                business_id=settings.yandex_accounts[0].business_id,
-                prices_data=price_payload
+                campaign_id=str(channel_id),  # <-- БЫЛО business_id, СТАЛО campaign_id
+                prices=price_payload          # <-- БЫЛО prices_data, СТАЛО prices
             )
             logger.info(f"[YANDEX] ✅ Price {price_value} {yandex_currency} set for {external_id}")
 
