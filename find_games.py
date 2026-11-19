@@ -33,7 +33,7 @@ def search_mode(query: str):
     
     while True:
         page += 1
-        params = {"channel_id": CHANNEL_ID, "limit": 100}
+        params = {"channel_id": CHANNEL_ID, "limit": 100,"publishing_or_covered": True}
         if cursor:
             params["cursor"] = cursor
         
