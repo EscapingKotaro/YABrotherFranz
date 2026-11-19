@@ -104,39 +104,6 @@ class RealYandexClient:
         logger.info(f"[YANDEX] ✅ Order {order_id} delivered: {result}")
         return result
 
-    @retry_with_backoff(max_retries=3, base_delay=2)
-    async def update_prices(
-        self,
-        business_id: str,
-        prices_data: list[dict],
-    ) -> dict:
-        """
-        Обновление цен для списка товаров.
-        prices_data: [{"offerId": "cndk-...", "price": {"value": 4299.0, "currencyId": "RUR"}}]
-        """
-        account = next((acc for acc in settings.yandex_accounts if str(acc.business_id) == str(business_id)), None)
-        if not account:
-            raise ValueError(f"Unknown business_id: {business_id}")
-
-        url = f"/v2/businesses/{business_id}/offer-prices/updates"
-        payload = {"prices": prices_data}
-
-        logger.info(f"[YANDEX] POST {url} | updating {len(prices_data)} prices")
-
-        response = await self.client.post(
-            url,
-            json=payload,
-            headers=self._get_headers(account),
-        )
-        response.raise_for_status()
-
-        result = response.json()
-        if result.get("status") == "ERROR":
-            logger.error(f"[YANDEX] ❌ Price update ERROR: {result}")
-            raise ValueError(f"Yandex Price API Error: {result}")
-
-        logger.info(f"[YANDEX] ✅ Prices updated successfully")
-        return result
 
 
     @retry_with_backoff(max_retries=3, base_delay=2)
@@ -435,24 +402,11 @@ class RealYandexClient:
     ) -> dict:
         """
         Обновление цен товаров.
-        
-        Args:
-            campaign_id: ID кампании
-            prices: Список цен:
-                [
-                    {
-                        "offerId": "cndk-xxx-ps5-p2",
-                        "price": {"value": 1990, "currencyId": "RUB"}
-                    }
-                ]
-        
-        Returns:
-            {"result": {"offers": [...]}}
         """
         account = self._get_account(campaign_id)
         
         url = f"/v2/campaigns/{campaign_id}/offer-prices/updates"
-        payload = {"offers": prices}
+        payload = {"offers": prices}  # 🔥 Правильный ключ "offers"
         
         logger.info(f"[YANDEX] POST {url} | prices_count={len(prices)}")
         
@@ -464,7 +418,11 @@ class RealYandexClient:
         response.raise_for_status()
         
         result = response.json()
-        logger.info(f"[YANDEX] ✅ Prices updated")
+        if result.get("status") == "ERROR":
+            logger.error(f"[YANDEX] ❌ Price update ERROR: {result}")
+            raise ValueError(f"Yandex Price API Error: {result}")
+            
+        logger.info(f"[YANDEX] ✅ Prices updated successfully")
         return result
     
     @retry_with_backoff(max_retries=3, base_delay=2)
@@ -565,6 +523,38 @@ class RealYandexClient:
     async def close(self):
         """Закрытие HTTP-клиента"""
         await self.client.aclose()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class MockYandexClient:
