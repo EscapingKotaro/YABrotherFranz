@@ -397,16 +397,19 @@ class RealYandexClient:
     @retry_with_backoff(max_retries=3, base_delay=2)
     async def update_prices(
         self,
-        campaign_id: str,
+        business_id: str,  # 🔥 ВОЗВРАЩАЕМ business_id, так как аккаунт требует дефолтные цены
         prices: list[dict],
     ) -> dict:
         """
-        Обновление цен товаров.
+        Обновление цен товаров на уровне бизнеса (дефолтные цены для всех магазинов).
         """
-        account = self._get_account(campaign_id)
+        account = next((acc for acc in settings.yandex_accounts if str(acc.business_id) == str(business_id)), None)
+        if not account:
+            raise ValueError(f"Unknown business_id: {business_id}")
         
-        url = f"/v2/campaigns/{campaign_id}/offer-prices/updates"
-        payload = {"offers": prices}  # 🔥 Правильный ключ "offers"
+        # 🔥 ПРАВИЛЬНЫЙ ЭНДПОИНТ ДЛЯ ТВОЕГО АККАУНТА
+        url = f"/v2/businesses/{business_id}/offer-prices/updates"
+        payload = {"offers": prices}
         
         logger.info(f"[YANDEX] POST {url} | prices_count={len(prices)}")
         
@@ -415,6 +418,12 @@ class RealYandexClient:
             json=payload,
             headers=self._get_headers(account),
         )
+        
+        # Логируем ответ, чтобы видеть успех или детали ошибки
+        response_text = response.text
+        logger.info(f"[YANDEX] 🔥 RESPONSE STATUS: {response.status_code}")
+        logger.info(f"[YANDEX] 🔥 RESPONSE BODY: {response_text}")
+        
         response.raise_for_status()
         
         result = response.json()
