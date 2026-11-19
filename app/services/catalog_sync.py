@@ -88,7 +88,10 @@ class CatalogSyncService:
             logger.error(f"[CatalogSync] SyncState not found for channel {channel_id}")
             return {"success": False, "error": "SyncState not found"}
         
-        cursor = sync_state.next_cursor
+        # 🔥 В СНАЙПЕРСКОМ РЕЖИМЕ мы игнорируем сохраненный курсор!
+        # Мы хотим найти наши целевые ID прямо сейчас, даже если они не менялись с момента последнего курсора.
+        cursor = None 
+        
         target_slots = []
         total_scanned = 0
         
