@@ -98,11 +98,11 @@ class FulfillmentService:
                 method=method,
             )
             
-            if not can_activate_resp.get("canActivate"):
-                reason = can_activate_resp.get("reason", "unknown")
-                logger.error(f"[Fulfillment] Cannot activate: {reason}")
+         #   if not can_activate_resp.get("canActivate"):
+           #     reason = can_activate_resp.get("reason", "unknown")
+           #     logger.error(f"[Fulfillment] Cannot activate: {reason}")
                 # Статус MANUAL_PENDING будет обработан в воркере через DLQ/алерт
-                raise Exception(f"No stock available: {reason}")
+        #        raise Exception(f"No stock available: {reason}")
             
             # 4. Выпуск кода (Issue)
             issue_resp = await self.code_client.issue_code(
