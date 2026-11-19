@@ -248,12 +248,11 @@ class CatalogSyncService:
             )
             logger.info(f"[YANDEX] ✅ Successfully created/updated offer {external_id}")
 
-            # 2. 🔥 ОТДЕЛЬНО ПРОСТАВЛЯЕМ ЦЕНУ
+            # 2. 🔥 ОТДЕЛЬНО ПРОСТАВЛЯЕМ ЦЕНУ (на уровне бизнеса)
             price_value = float(target.get("amount", 0))
             currency = target.get("currency", "RUB")
-            # Яндекс часто требует именно 'RUR' для валюты, а не 'RUB'
-            yandex_currency = "RUR" if currency == "RUB" else currency
-
+            yandex_currency = "RUR" if currency == "RUB" else currency 
+            
             price_payload = [{
                 "offerId": external_id,
                 "price": {
@@ -261,15 +260,16 @@ class CatalogSyncService:
                     "currencyId": yandex_currency
                 }
             }]
-
-            yandex_campaign_id = settings.yandex_accounts[0].campaign_id
+            
+            # 🔥 ИСПРАВЛЕНИЕ: Берем business_id, так как Яндекс требует дефолтные цены
+            yandex_business_id = settings.yandex_accounts[0].business_id
             
             await self.yandex_client.update_prices(
-                campaign_id=yandex_campaign_id,  # <-- ТЕПЕРЬ ТУТ "148878241"
+                business_id=yandex_business_id,  # <-- ТЕПЕРЬ СНОВА business_id ("216509163")
                 prices=price_payload
             )
             logger.info(f"[YANDEX] ✅ Price {price_value} {yandex_currency} set for {external_id}")
-
+            
         except Exception as e:
             logger.error(f"[YANDEX] ❌ Failed to process offer {external_id}: {e}")
             raise e
